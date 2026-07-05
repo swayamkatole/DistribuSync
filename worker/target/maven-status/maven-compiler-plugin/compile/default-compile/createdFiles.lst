@@ -1,0 +1,4 @@
+com\distribusync\worker\WorkerGrpcService.class
+com\distribusync\worker\WorkerGrpcServer.class
+com\distribusync\worker\WorkerThreadPool.class
+com\distribusync\worker\WorkerApplication.class

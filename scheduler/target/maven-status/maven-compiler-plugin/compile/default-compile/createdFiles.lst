@@ -1,0 +1,5 @@
+com\distribusync\scheduler\SchedulerController.class
+com\distribusync\scheduler\JobSchedulerService.class
+com\distribusync\scheduler\ZooKeeperLeaderElection.class
+com\distribusync\scheduler\ConsistentHashRouter.class
+com\distribusync\scheduler\SchedulerApplication.class

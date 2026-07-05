@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15
+    container_name: distribusync-db
+    environment:
+      POSTGRES_DB: distribusync
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      PGTZ: UTC
+      TZ: UTC
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  zookeeper:
+    image: zookeeper:3.9
+    container_name: distribusync-zookeeper
+    ports:
+      - '2181:2181'
+volumes:
+  postgres_data:

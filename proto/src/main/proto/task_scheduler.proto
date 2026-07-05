@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.distribusync.grpc";
+option java_outer_classname = "TaskSchedulerProto";
+
+package taskscheduler;
+
+// ─── Messages ───────────────────────────────────────
+
+// Job submitted by client to Scheduler
+message JobRequest {
+  string job_name = 1;
+  string payload = 2;   // any extra data as JSON string
+}
+
+// Scheduler's response after accepting a job
+message JobResponse {
+  string job_id = 1;
+  string status = 2;    // PENDING, ACCEPTED, REJECTED
+  string message = 3;
+}
+
+// Scheduler sends this to Worker to execute
+message TaskAssignment {
+  string job_id = 1;
+  string job_name = 2;
+  string payload = 3;
+  string worker_id = 4;
+}
+
+// Worker reports back job result to Scheduler
+message TaskResult {
+  string job_id = 1;
+  string worker_id = 2;
+  string status = 3;    // COMPLETED, FAILED
+  string result = 4;
+}
+
+// Worker registration message
+message WorkerInfo {
+  string worker_id = 1;
+  string host = 2;
+  int32 port = 3;
+}
+
+// Simple acknowledgement
+message Ack {
+  bool success = 1;
+  string message = 2;
+}
+
+// ─── Services ───────────────────────────────────────
+
+// Client → Scheduler: submit jobs
+service SchedulerService {
+  rpc SubmitJob(JobRequest) returns (JobResponse);
+  rpc GetJobStatus(JobResponse) returns (JobResponse);
+}
+
+// Scheduler → Worker: assign tasks
+service WorkerService {
+  rpc AssignTask(TaskAssignment) returns (TaskResult);
+  rpc RegisterWorker(WorkerInfo) returns (Ack);
+  rpc Heartbeat(WorkerInfo) returns (Ack);
+}

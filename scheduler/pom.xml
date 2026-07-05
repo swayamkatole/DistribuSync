@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.distribusync</groupId>
+        <artifactId>distribusync-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    <artifactId>scheduler</artifactId>
+    <dependencies>
+        <dependency><groupId>com.distribusync</groupId><artifactId>proto</artifactId><version>1.0.0</version></dependency>
+        <dependency><groupId>com.distribusync</groupId><artifactId>common</artifactId><version>1.0.0</version></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter</artifactId></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jpa</artifactId></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+        <dependency><groupId>io.grpc</groupId><artifactId>grpc-netty-shaded</artifactId><version>1.58.0</version></dependency>
+        <dependency><groupId>io.grpc</groupId><artifactId>grpc-protobuf</artifactId><version>1.58.0</version></dependency>
+        <dependency><groupId>io.grpc</groupId><artifactId>grpc-stub</artifactId><version>1.58.0</version></dependency>
+        <dependency><groupId>javax.annotation</groupId><artifactId>javax.annotation-api</artifactId><version>1.3.2</version></dependency>
+        <dependency><groupId>org.apache.zookeeper</groupId><artifactId>zookeeper</artifactId><version>3.9.1</version></dependency>
+        <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId></dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration><source>17</source><target>17</target></configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <mainClass>com.distribusync.scheduler.SchedulerApplication</mainClass>
+                    <jvmArguments>-Duser.timezone=UTC</jvmArguments>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
