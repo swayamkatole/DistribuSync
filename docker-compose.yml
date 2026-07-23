@@ -1,4 +1,5 @@
 version: '3.8'
+
 services:
   postgres:
     image: postgres:15
@@ -7,16 +8,46 @@ services:
       POSTGRES_DB: distribusync
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
-      PGTZ: UTC
-      TZ: UTC
     ports:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d distribusync"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   zookeeper:
     image: zookeeper:3.9
     container_name: distribusync-zookeeper
     ports:
       - '2181:2181'
-volumes:
-  postgres_data:
+
+  scheduler:
+    build: .
+    container_name: distribusync-scheduler
+    command: ["java", "-jar", "scheduler.jar"]
+    ports:
+      - '8080:8080'
+    environment:
+      - ZOOKEEPER_HOST=zookeeper:2181
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/distribusync
+    depends_on:
+      postgres:
+        condition: service_healthy
+      zookeeper:
+        condition: service_started
+
+  worker:
+    build: .
+    container_name: distribusync-worker
+    command: ["java", "-jar", "worker.jar"]
+    ports:
+      - '8081:8081'
+      - '9090:9090'
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/distribusync
+    depends_on:
+      postgres:
+        condition: service_healthy
