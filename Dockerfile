@@ -2,7 +2,7 @@
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copy the pom files and source modules explicitly
+# Copy configuration and subfolder modules explicitly
 COPY pom.xml .
 COPY common ./common
 COPY proto ./proto
@@ -16,10 +16,10 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
-# This targets the executable spring-boot jar directly inside the scheduler module output path
+# Copy the built jar from your primary runnable module (scheduler)
 COPY --from=build /app/scheduler/target/scheduler-*.jar app.jar
 
 EXPOSE 8080
 
-# This executes the class directly so you don't hit manifest issues
-ENTRYPOINT ["java", "-cp", "app.jar", "org.springframework.boot.loader.launch.JarLauncher"]
+# This executes your application jar directly using the standard Java archive runner tool
+ENTRYPOINT ["java", "-jar", "app.jar"]
