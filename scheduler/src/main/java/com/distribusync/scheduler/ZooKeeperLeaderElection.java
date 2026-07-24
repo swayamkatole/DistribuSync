@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class ZooKeeperLeaderElection implements Watcher {
@@ -21,11 +23,16 @@ public class ZooKeeperLeaderElection implements Watcher {
     private String currentZNode;
     private boolean isLeader = false;
     private static final String ELECTION_PATH = "/election";
+    private CountDownLatch connectedSignal = new CountDownLatch(1);
 
     @PostConstruct
     public void start() throws Exception {
-        zooKeeper = new ZooKeeper(zookeeperHost, 3000, this);
-        Thread.sleep(1000);
+        // Increased session timeout to 10 seconds for cloud networks
+        zooKeeper = new ZooKeeper(zookeeperHost, 10000, this);
+        
+        // Wait up to 10 seconds for a successful connection instead of a hardcoded 1 second sleep
+        connectedSignal.await(10, TimeUnit.SECONDS);
+        
         Stat stat = zooKeeper.exists(ELECTION_PATH, false);
         if (stat == null) {
             zooKeeper.create(ELECTION_PATH, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -53,6 +60,9 @@ public class ZooKeeperLeaderElection implements Watcher {
 
     @Override
     public void process(WatchedEvent event) {
+        if (event.getState() == Event.KeeperState.SyncConnected) {
+            connectedSignal.countDown(); // Signals that the connection is ready!
+        }
         if (event.getType() == Event.EventType.NodeDeleted) {
             try { checkLeadership(); } catch (Exception e) { e.printStackTrace(); }
         }
