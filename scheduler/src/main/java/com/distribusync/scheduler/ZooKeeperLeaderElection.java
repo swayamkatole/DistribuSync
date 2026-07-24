@@ -2,6 +2,7 @@ package com.distribusync.scheduler;
 
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 import java.util.Collections;
@@ -10,8 +11,12 @@ import java.util.List;
 @Component
 public class ZooKeeperLeaderElection implements Watcher {
 
-    private final String zookeeperHost = "localhost:2181";
-    private final String schedulerId = "scheduler-1";
+    @Value("${zookeeper.host:localhost:2181}")
+    private String zookeeperHost;
+
+    @Value("${scheduler.id:scheduler-1}")
+    private String schedulerId;
+
     private ZooKeeper zooKeeper;
     private String currentZNode;
     private boolean isLeader = false;
