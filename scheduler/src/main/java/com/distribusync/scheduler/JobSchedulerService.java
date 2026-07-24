@@ -32,9 +32,9 @@ public class JobSchedulerService {
 
     public void registerWorker(String workerId, String host, int port) {
         ManagedChannel channel = ManagedChannelBuilder
-                .forAddress(host, port)
-                .usePlaintext()
-                .build();
+        .forAddress(host, port)
+        .useTransportSecurity()
+        .build();
         workerChannels.put(workerId, channel);
         hashRouter.addWorker(workerId);
         System.out.println("Registered worker: " + workerId + " at " + host + ":" + port);
