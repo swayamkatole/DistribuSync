@@ -4,6 +4,7 @@ import com.distribusync.common.*;
 import com.distribusync.grpc.*;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -20,11 +21,13 @@ public class JobSchedulerService {
 
     public JobSchedulerService(JobRepository jobRepository,
                                ConsistentHashRouter hashRouter,
-                               ZooKeeperLeaderElection leaderElection) {
+                               ZooKeeperLeaderElection leaderElection,
+                               @Value("${worker.host:localhost}") String workerHost,
+                               @Value("${worker.grpc.port:9090}") int workerPort) {
         this.jobRepository = jobRepository;
         this.hashRouter = hashRouter;
         this.leaderElection = leaderElection;
-        registerWorker("worker-1", "localhost", 9090);
+        registerWorker("worker-1", workerHost, workerPort);
     }
 
     public void registerWorker(String workerId, String host, int port) {
