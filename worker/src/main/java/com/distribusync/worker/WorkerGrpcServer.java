@@ -2,6 +2,7 @@ package com.distribusync.worker;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -9,7 +10,9 @@ import jakarta.annotation.PreDestroy;
 @Component
 public class WorkerGrpcServer {
 
-    private static final int GRPC_PORT = 9090;
+    @Value("${PORT:9090}")
+    private int grpcPort;
+
     private Server server;
     private final WorkerGrpcService workerGrpcService;
 
@@ -19,11 +22,11 @@ public class WorkerGrpcServer {
 
     @PostConstruct
     public void start() throws Exception {
-        server = ServerBuilder.forPort(GRPC_PORT)
+        server = ServerBuilder.forPort(grpcPort)
                 .addService(workerGrpcService)
                 .build()
                 .start();
-        System.out.println("Worker gRPC server started on port " + GRPC_PORT);
+        System.out.println("Worker gRPC server started on port " + grpcPort);
     }
 
     @PreDestroy
