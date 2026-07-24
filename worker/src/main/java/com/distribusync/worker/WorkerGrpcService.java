@@ -1,78 +1,68 @@
-package com.distribusync.scheduler;
+package com.distribusync.worker;
 
-import com.distribusync.common.*;
 import com.distribusync.grpc.*;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import org.springframework.beans.factory.annotation.Value;
+import io.grpc.stub.StreamObserver;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
-
 @Service
-public class JobSchedulerService {
+public class WorkerGrpcService extends WorkerServiceGrpc.WorkerServiceImplBase {
 
-    private final JobRepository jobRepository;
-    private final ConsistentHashRouter hashRouter;
-    private final ZooKeeperLeaderElection leaderElection;
-    private final Map<String, ManagedChannel> workerChannels = new HashMap<>();
+    private final WorkerThreadPool threadPool;
 
-    public JobSchedulerService(JobRepository jobRepository,
-                               ConsistentHashRouter hashRouter,
-                               ZooKeeperLeaderElection leaderElection,
-                               @Value("${worker.host:localhost}") String workerHost,
-                               @Value("${worker.grpc.port:443}") int workerPort) {
-        this.jobRepository = jobRepository;
-        this.hashRouter = hashRouter;
-        this.leaderElection = leaderElection;
-        registerWorker("worker-1", workerHost, workerPort);
+    public WorkerGrpcService(WorkerThreadPool threadPool) {
+        this.threadPool = threadPool;
     }
 
-    public void registerWorker(String workerId, String host, int port) {
-        ManagedChannel channel = ManagedChannelBuilder
-                .forAddress(host, port)
-                .useTransportSecurity()
+    @Override
+    public void assignTask(TaskAssignment request,
+                           StreamObserver<TaskResult> responseObserver) {
+        String jobId = request.getJobId();
+        String jobName = request.getJobName();
+
+        System.out.println("Received task assignment: " + jobId);
+
+        boolean accepted = threadPool.submitJob(jobId, jobName, () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+
+        TaskResult result = TaskResult.newBuilder()
+                .setJobId(jobId)
+                .setWorkerId(request.getWorkerId())
+                .setStatus(accepted ? "COMPLETED" : "FAILED")
+                .setResult(accepted ? "Job executed successfully" : "Worker at capacity")
                 .build();
-        workerChannels.put(workerId, channel);
-        hashRouter.addWorker(workerId);
-        System.out.println("Registered worker: " + workerId + " at " + host + ":" + port);
+
+        responseObserver.onNext(result);
+        responseObserver.onCompleted();
     }
 
-    public Job submitJob(String jobName) {
-        if (!leaderElection.isLeader()) {
-            throw new RuntimeException("This scheduler is not the leader!");
-        }
-        Job job = new Job(jobName);
-        job = jobRepository.save(job);
+    @Override
+    public void registerWorker(WorkerInfo request,
+                               StreamObserver<Ack> responseObserver) {
+        System.out.println("Worker registered: " + request.getWorkerId());
 
-        String workerId = hashRouter.getWorkerForJob(job.getId());
-        if (workerId == null) {
-            job.setStatus(JobStatus.FAILED);
-            jobRepository.save(job);
-            throw new RuntimeException("No workers available!");
-        }
-
-        System.out.println("Assigning job " + job.getId() + " to worker " + workerId);
-
-        ManagedChannel channel = workerChannels.get(workerId);
-        WorkerServiceGrpc.WorkerServiceBlockingStub stub =
-                WorkerServiceGrpc.newBlockingStub(channel);
-
-        TaskAssignment assignment = TaskAssignment.newBuilder()
-                .setJobId(job.getId())
-                .setJobName(jobName)
-                .setWorkerId(workerId)
-                .setPayload("{}")
+        Ack ack = Ack.newBuilder()
+                .setSuccess(true)
+                .setMessage("Worker " + request.getWorkerId() + " registered successfully")
                 .build();
 
-        TaskResult result = stub.assignTask(assignment);
+        responseObserver.onNext(ack);
+        responseObserver.onCompleted();
+    }
 
-        job.setStatus(result.getStatus().equals("COMPLETED") ?
-                JobStatus.COMPLETED : JobStatus.FAILED);
-        job.setAssignedWorker(workerId);
-        jobRepository.save(job);
+    @Override
+    public void heartbeat(WorkerInfo request,
+                          StreamObserver<Ack> responseObserver) {
+        Ack ack = Ack.newBuilder()
+                .setSuccess(true)
+                .setMessage("alive")
+                .build();
 
-        return job;
+        responseObserver.onNext(ack);
+        responseObserver.onCompleted();
     }
 }
