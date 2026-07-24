@@ -21,25 +21,34 @@ public class ZooKeeperLeaderElection implements Watcher {
 
     private ZooKeeper zooKeeper;
     private String currentZNode;
-    private boolean isLeader = false;
+    private boolean isLeader = true; // Default to true so app works without Zookeeper
     private static final String ELECTION_PATH = "/election";
     private CountDownLatch connectedSignal = new CountDownLatch(1);
 
     @PostConstruct
-    public void start() throws Exception {
-        // Increased session timeout to 10 seconds for cloud networks
-        zooKeeper = new ZooKeeper(zookeeperHost, 10000, this);
-        
-        // Wait up to 10 seconds for a successful connection instead of a hardcoded 1 second sleep
-        connectedSignal.await(10, TimeUnit.SECONDS);
-        
-        Stat stat = zooKeeper.exists(ELECTION_PATH, false);
-        if (stat == null) {
-            zooKeeper.create(ELECTION_PATH, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+    public void start() {
+        try {
+            zooKeeper = new ZooKeeper(zookeeperHost, 10000, this);
+            boolean connected = connectedSignal.await(8, TimeUnit.SECONDS);
+
+            if (!connected) {
+                System.out.println("WARNING: Could not connect to Zookeeper at " + zookeeperHost + ". Running as standalone leader.");
+                isLeader = true;
+                return;
+            }
+
+            Stat stat = zooKeeper.exists(ELECTION_PATH, false);
+            if (stat == null) {
+                zooKeeper.create(ELECTION_PATH, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            }
+            currentZNode = zooKeeper.create(ELECTION_PATH + "/scheduler_", schedulerId.getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+            System.out.println("Registered in election: " + currentZNode);
+            checkLeadership();
+
+        } catch (Exception e) {
+            System.out.println("WARNING: Zookeeper connection failed: " + e.getMessage() + ". Running as standalone leader.");
+            isLeader = true;
         }
-        currentZNode = zooKeeper.create(ELECTION_PATH + "/scheduler_", schedulerId.getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
-        System.out.println("Registered in election: " + currentZNode);
-        checkLeadership();
     }
 
     private void checkLeadership() throws Exception {
@@ -61,7 +70,7 @@ public class ZooKeeperLeaderElection implements Watcher {
     @Override
     public void process(WatchedEvent event) {
         if (event.getState() == Event.KeeperState.SyncConnected) {
-            connectedSignal.countDown(); // Signals that the connection is ready!
+            connectedSignal.countDown();
         }
         if (event.getType() == Event.EventType.NodeDeleted) {
             try { checkLeadership(); } catch (Exception e) { e.printStackTrace(); }
