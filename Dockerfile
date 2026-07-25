@@ -10,3 +10,7 @@ WORKDIR /app
 # Copy both jars
 COPY --from=build /app/scheduler/target/*.jar scheduler.jar
 COPY --from=build /app/worker/target/*.jar worker.jar
+
+# Worker is the HTTP service; listen on $PORT if set, otherwise default to 3000
+ENV PORT=3000
+CMD ["sh", "-c", "java -jar worker.jar --server.port=${PORT:-3000}"]
