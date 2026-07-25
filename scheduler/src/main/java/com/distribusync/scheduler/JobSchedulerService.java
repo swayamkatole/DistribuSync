@@ -1,12 +1,9 @@
 package com.distribusync.scheduler;
 
 import com.distribusync.common.*;
-import com.distribusync.grpc.*;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
+import org.springframework.web.client.RestTemplate;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -16,34 +13,36 @@ public class JobSchedulerService {
     private final JobRepository jobRepository;
     private final ConsistentHashRouter hashRouter;
     private final ZooKeeperLeaderElection leaderElection;
+    private final RestTemplate restTemplate = new RestTemplate();
 
-    private final Map<String, ManagedChannel> workerChannels = new HashMap<>();
+    @Value("${worker.host:localhost}")
+    private String workerHost;
+
+    @Value("${worker.port:8081}")
+    private String workerPort;
+
+    private final Map<String, String> workerUrls = new HashMap<>();
 
     public JobSchedulerService(JobRepository jobRepository,
                                ConsistentHashRouter hashRouter,
-                               ZooKeeperLeaderElection leaderElection,
-                               @Value("${worker.host:localhost}") String workerHost,
-                               @Value("${worker.grpc.port:9090}") int workerPort) {
+                               ZooKeeperLeaderElection leaderElection) {
         this.jobRepository = jobRepository;
         this.hashRouter = hashRouter;
         this.leaderElection = leaderElection;
-        registerWorker("worker-1", workerHost, workerPort);
     }
 
-    public void registerWorker(String workerId, String host, int port) {
-        ManagedChannel channel = ManagedChannelBuilder
-        .forAddress(host, port)
-        .useTransportSecurity()
-        .build();
-        workerChannels.put(workerId, channel);
+    public void registerWorker(String workerId, String host, String port) {
+        String url = "https://" + host + "/worker/execute";
+        workerUrls.put(workerId, url);
         hashRouter.addWorker(workerId);
-        System.out.println("Registered worker: " + workerId + " at " + host + ":" + port);
+        System.out.println("Registered worker: " + workerId + " at " + url);
     }
 
     public Job submitJob(String jobName) {
-        if (!leaderElection.isLeader()) {
-            throw new RuntimeException("This scheduler is not the leader!");
+        if (workerUrls.isEmpty()) {
+            registerWorker("worker-1", workerHost, workerPort);
         }
+
         Job job = new Job(jobName);
         job = jobRepository.save(job);
 
@@ -56,24 +55,23 @@ public class JobSchedulerService {
 
         System.out.println("Assigning job " + job.getId() + " to worker " + workerId);
 
-        ManagedChannel channel = workerChannels.get(workerId);
-        WorkerServiceGrpc.WorkerServiceBlockingStub stub =
-                WorkerServiceGrpc.newBlockingStub(channel);
+        String workerUrl = workerUrls.get(workerId);
 
-        TaskAssignment assignment = TaskAssignment.newBuilder()
-                .setJobId(job.getId())
-                .setJobName(jobName)
-                .setWorkerId(workerId)
-                .setPayload("{}")
-                .build();
+        Map<String, String> request = new HashMap<>();
+        request.put("jobId", job.getId());
+        request.put("jobName", jobName);
 
-        TaskResult result = stub.assignTask(assignment);
+        try {
+            Map response = restTemplate.postForObject(workerUrl, request, Map.class);
+            String status = response != null ? (String) response.get("status") : "FAILED";
+            job.setStatus(status.equals("COMPLETED") ? JobStatus.COMPLETED : JobStatus.FAILED);
+        } catch (Exception e) {
+            System.err.println("Worker call failed: " + e.getMessage());
+            job.setStatus(JobStatus.FAILED);
+        }
 
-        job.setStatus(result.getStatus().equals("COMPLETED") ?
-                JobStatus.COMPLETED : JobStatus.FAILED);
         job.setAssignedWorker(workerId);
         jobRepository.save(job);
-
         return job;
     }
 }
