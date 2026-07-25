@@ -10,7 +10,7 @@ import jakarta.annotation.PreDestroy;
 @Component
 public class WorkerGrpcServer {
 
-    @Value("${PORT:9090}")
+    @Value("${worker.grpc.port:9090}")
     private int grpcPort;
 
     private Server server;
