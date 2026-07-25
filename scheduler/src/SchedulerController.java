@@ -1,5 +1,6 @@
 package com.distribusync.scheduler;
 
+import org.springframework.web.bind.annotation.CrossOrigin;
 import com.distribusync.common.Job;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
